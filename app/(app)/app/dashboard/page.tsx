@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusChip } from '@/components/ui/status-chip'

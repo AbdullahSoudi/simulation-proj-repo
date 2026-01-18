@@ -1,6 +1,23 @@
-import { AppShell } from '@/components/app-shell/AppShell'
+import { ReactNode } from 'react'
+import { redirect } from 'next/navigation'
 
-export default function AppGroupLayout({ children }: { children: React.ReactNode }) {
+import { AppShell } from '@/components/app-shell/AppShell'
+import { getSupabaseServerClient } from '@/lib/supabase/server'
+
+type AppGroupLayoutProps = {
+  children: ReactNode
+}
+
+export default async function AppGroupLayout({ children }: AppGroupLayoutProps) {
+  const supabase = await getSupabaseServerClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
   return <AppShell>{children}</AppShell>
 }
 

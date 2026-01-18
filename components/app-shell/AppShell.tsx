@@ -1,8 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createContext, useContext, useMemo, useState } from 'react'
+
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
 
 export type Role = 'reception' | 'doctor'
 
@@ -91,9 +94,19 @@ function NavLink({
   )
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+type AppShellProps = {
+  children: React.ReactNode
+  initialRole?: Role
+  allowRoleSwitch?: boolean
+}
+
+export function AppShell({ children, initialRole, allowRoleSwitch }: AppShellProps) {
   const pathname = usePathname()
-  const [role, setRole] = useState<Role>('reception')
+  const router = useRouter()
+  const [role, setRole] = useState<Role>(initialRole ?? 'reception')
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const supabase = getSupabaseBrowserClient()
+  const canSwitchRole = allowRoleSwitch ?? !initialRole
 
   const grouped = useMemo(() => {
     const allowed = new Set(ROLE_NAV[role])
@@ -104,6 +117,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       items: visible.filter((i) => i.group === g),
     }))
   }, [role])
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true)
+    await supabase.auth.signOut()
+    setIsSigningOut(false)
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <RoleContext.Provider value={role}>
@@ -119,6 +140,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <select
                 className="mt-2 h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none"
                 value={role}
+                disabled={!canSwitchRole}
                 onChange={(e) => setRole(e.target.value as Role)}
               >
                 <option value="reception">Reception</option>
@@ -155,6 +177,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   placeholder="Global search: patients / phone / ID"
                   disabled
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                >
+                  {isSigningOut ? 'Signing out…' : 'Log out'}
+                </Button>
               </div>
             </header>
 
@@ -165,4 +196,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </RoleContext.Provider>
   )
 }
-
