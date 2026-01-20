@@ -1,0 +1,3 @@
+Follow project-blueprint/AGENT_RULES.md as the highest-priority ruleset.
+Also obey project-blueprint/PRD.md, project-blueprint/DESIGN_SYSTEM.md, project-blueprint/SITE_MAP.md, project-blueprint/WIRE_FRAMES.md.
+If any conflict occurs: AGENT_RULES.md wins.
