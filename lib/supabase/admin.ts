@@ -15,7 +15,7 @@ export function getSupabaseAdminClient(): SupabaseClient {
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
-      'Missing Supabase service role configuration. Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set on the server.'
+      'Missing Supabase service role configuration. Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set on the SERVER and restart/redeploy the app.'
     )
   }
 

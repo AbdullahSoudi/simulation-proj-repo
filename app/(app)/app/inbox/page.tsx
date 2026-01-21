@@ -19,15 +19,17 @@ export default function InboxPage() {
         </h2>
         <div className="mt-3 grid gap-3 md:grid-cols-2 text-sm text-[var(--text-2)]">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-            Tabs placeholder:&nbsp;
-            <span className="font-medium">Matched</span> /{' '}
-            <span className="inline-flex items-center gap-2 font-medium">
-              Unmatched
-              <span className="inline-flex h-5 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--danger-100)] px-2 text-xs font-semibold text-[var(--danger-600)]">
-                5
-              </span>
-            </span>{' '}
-            / <span className="font-medium">Escalated</span>
+            <div>
+              Tabs placeholder:&nbsp;
+              <span className="font-medium">Matched</span> /{' '}
+              <span className="inline-flex items-center gap-2 font-medium">
+                Unmatched
+                <span className="inline-flex h-5 min-w-[1.5rem] items-center justify-center rounded-full bg-[var(--danger-100)] px-2 text-xs font-semibold text-[var(--danger-600)]">
+                  5
+                </span>
+              </span>{' '}
+              / <span className="font-medium">Escalated</span>
+            </div>
           </div>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
             <div>Filters placeholder: Channel, Status, Assigned to</div>
@@ -56,7 +58,7 @@ export default function InboxPage() {
                   <StatusChip kind="resolved" />
                 </div>
               </div>
-                <div className="mt-3">
+              <div className="mt-3">
                 <DataTablePlaceholder
                   label="Inbox items (placeholder)"
                   columns={['Sender', 'Patient', 'Intent', 'Status', 'Last message', 'Time']}
