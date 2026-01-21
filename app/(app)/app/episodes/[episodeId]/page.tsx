@@ -190,6 +190,35 @@ export default async function EpisodeDetailPage({
     notes: string | null
   }>
 
+  // Fetch encounters linked to this episode
+  const { data: encounterThreads, error: encountersError } = await supabase
+    .from('encounter_threads')
+    .select('id, note_type, created_at')
+    .eq('episode_id', episodeId)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  // Fetch latest version status for each thread
+  const threadIds = (encounterThreads || []).map((t) => t.id)
+  const latestVersions: Record<string, { status: string }> = {}
+  if (threadIds.length > 0) {
+    const { data: versions } = await supabase
+      .from('encounter_versions')
+      .select('thread_id, status, created_at')
+      .in('thread_id', threadIds)
+      .order('created_at', { ascending: false })
+
+    if (versions) {
+      const seen = new Set<string>()
+      for (const v of versions as Array<{ thread_id: string; status: string }>) {
+        if (!seen.has(v.thread_id)) {
+          seen.add(v.thread_id)
+          latestVersions[v.thread_id] = { status: v.status }
+        }
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -332,6 +361,78 @@ export default async function EpisodeDetailPage({
               </table>
             </div>
           )}
+        </div>
+      </Card>
+
+      <Card title="Encounters">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-[var(--text-3)]">
+              {encounterThreads?.length || 0} {encounterThreads?.length === 1 ? 'encounter' : 'encounters'}
+            </div>
+            <Link
+              href={`/app/encounters/new?patientId=${e.patient_id}&episodeId=${e.id}`}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--primary-600)] px-3 text-sm font-medium text-white hover:bg-[var(--primary-700)]"
+            >
+              New Encounter
+            </Link>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-white">
+            {encountersError ? (
+              <div className="p-4 text-sm text-[var(--danger-600)]">
+                Failed to load encounters: {encountersError.message}
+              </div>
+            ) : !encounterThreads || encounterThreads.length === 0 ? (
+              <div className="p-4 text-sm text-[var(--text-2)]">No encounters linked to this episode.</div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-3)]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Type</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Created</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {encounterThreads.map((t) => {
+                    const latestVersion = latestVersions[t.id]
+                    const status = latestVersion?.status || 'draft'
+                    return (
+                      <tr key={t.id} className="hover:bg-[var(--surface-muted)]/60">
+                        <td className="px-4 py-3 text-[var(--text-2)] capitalize">
+                          {t.note_type.replace('_', ' ')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize ${
+                              status === 'finalized'
+                                ? 'bg-[var(--success-100)] text-[var(--success-600)]'
+                                : 'bg-[var(--warning-100)] text-[var(--warning-600)]'
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">
+                          {new Date(t.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Link
+                            href={`/app/encounters/${t.id}`}
+                            className="text-sm font-medium text-[var(--primary-700)] hover:underline"
+                          >
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </Card>
 
