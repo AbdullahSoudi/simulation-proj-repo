@@ -1,8 +1,11 @@
 import Link from 'next/link'
 
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { getUserRoleIds } from '@/lib/rbac'
 import { PageHeader } from '@/components/ui/page-header'
 import { PreOpChecklist } from './PreOpChecklist'
+import { AnesthesiaAssessment } from './AnesthesiaAssessment'
+import { PostOpFollowup } from './PostOpFollowup'
 
 type EpisodeRow = {
   id: string
@@ -134,6 +137,43 @@ export default async function EpisodeDetailPage({
     checklistItems = (items ?? []) as typeof checklistItems
   }
 
+  // Fetch anesthesia assessment if exists
+  const { data: anesthesiaAssessment } = await supabase
+    .from('anesthesia_assessments')
+    .select('id, episode_id, asa_class, mallampati, comorbidities, allergies, current_meds, fasting_status, planned_anesthesia, notes, is_finalized, finalized_at, finalized_by')
+    .eq('episode_id', episodeId)
+    .maybeSingle()
+
+  // Check if user can edit (anesthesia or admin role)
+  const { roleIds } = await getUserRoleIds()
+  const canEditAnesthesia = roleIds.includes('anesthesia') || roleIds.includes('admin')
+
+  // Fetch follow-up plan if exists
+  const { data: followupPlan } = await supabase
+    .from('episode_followup_plans')
+    .select('id')
+    .eq('episode_id', episodeId)
+    .maybeSingle()
+
+  let followupTasks: Array<{
+    id: string
+    title: string
+    due_at: string
+    status: 'pending' | 'done' | 'skipped'
+    completed_at: string | null
+    notes: string | null
+  }> = []
+
+  if (followupPlan) {
+    const { data: tasks } = await supabase
+      .from('episode_tasks')
+      .select('id, title, due_at, status, completed_at, notes')
+      .eq('episode_id', episodeId)
+      .order('due_at', { ascending: true })
+
+    followupTasks = (tasks ?? []) as typeof followupTasks
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -205,15 +245,26 @@ export default async function EpisodeDetailPage({
         />
       </Card>
 
+      <Card title="Anesthesia">
+        <AnesthesiaAssessment
+          episodeId={episodeId}
+          assessment={anesthesiaAssessment as any}
+          canEdit={canEditAnesthesia}
+        />
+      </Card>
+
+      <Card title="Post-op Follow-up Plan">
+        <PostOpFollowup
+          episodeId={episodeId}
+          planId={followupPlan?.id ?? null}
+          scheduledAt={e.scheduled_at}
+          tasks={followupTasks}
+        />
+      </Card>
+
       <section className="grid gap-4 md:grid-cols-2">
-        <Card title="Anesthesia (placeholder)">
-          Anesthesia clearance and notes will be implemented here.
-        </Card>
         <Card title="Intra-op (placeholder)">
           Intra-operative notes and observations will be implemented here.
-        </Card>
-        <Card title="Post-op follow-up (placeholder)">
-          Post-operative follow-up tasks and notes will be implemented here.
         </Card>
       </section>
 
