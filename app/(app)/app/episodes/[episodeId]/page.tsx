@@ -174,6 +174,22 @@ export default async function EpisodeDetailPage({
     followupTasks = (tasks ?? []) as typeof followupTasks
   }
 
+  // Fetch linked appointments
+  const { data: appointments } = await supabase
+    .from('appointments')
+    .select('id, visit_type, status, starts_at, ends_at, notes')
+    .eq('episode_id', episodeId)
+    .order('starts_at', { ascending: true })
+
+  const appointmentRows = (appointments ?? []) as Array<{
+    id: string
+    visit_type: string
+    status: string
+    starts_at: string
+    ends_at: string
+    notes: string | null
+  }>
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -260,6 +276,63 @@ export default async function EpisodeDetailPage({
           scheduledAt={e.scheduled_at}
           tasks={followupTasks}
         />
+      </Card>
+
+      <Card title="Appointments">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-[var(--text-3)]">
+              {appointmentRows.length} {appointmentRows.length === 1 ? 'appointment' : 'appointments'} linked
+            </div>
+            <Link
+              href={`/app/schedule/new?patientId=${e.patient_id}&episodeId=${episodeId}`}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--primary-600)] px-3 text-sm font-medium text-white hover:bg-[var(--primary-700)]"
+            >
+              Add appointment
+            </Link>
+          </div>
+
+          {appointmentRows.length === 0 ? (
+            <div className="text-sm text-[var(--text-2)]">No appointments linked to this episode.</div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-white">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-3)]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Date & Time</th>
+                    <th className="px-4 py-3 text-left">Type</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {appointmentRows.map((a) => {
+                    const startTime = new Date(a.starts_at)
+                    return (
+                      <tr key={a.id} className="hover:bg-[var(--surface-muted)]/60">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-[var(--text)]">
+                            {startTime.toLocaleDateString()}
+                          </div>
+                          <div className="text-xs text-[var(--text-3)]">
+                            {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-[var(--text-2)] capitalize">
+                          {a.visit_type ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize bg-[var(--surface-muted)] text-[var(--text-2)]">
+                            {a.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </Card>
 
       <section className="grid gap-4 md:grid-cols-2">

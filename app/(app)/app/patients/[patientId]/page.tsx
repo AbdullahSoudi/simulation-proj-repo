@@ -119,10 +119,32 @@ export default async function PatientProfilePage({
     .eq('patient_id', patientId)
     .order('updated_at', { ascending: false })
 
+  // Fetch upcoming appointments (next 30 days)
+  const now = new Date()
+  const futureDate = new Date(now)
+  futureDate.setDate(futureDate.getDate() + 30)
+
+  const { data: appointments, error: appointmentsError } = await supabase
+    .from('appointments')
+    .select('id, episode_id, visit_type, status, starts_at, ends_at, notes')
+    .eq('patient_id', patientId)
+    .gte('starts_at', now.toISOString())
+    .lte('starts_at', futureDate.toISOString())
+    .order('starts_at', { ascending: true })
+
   const p = patient as PatientRow
   const idRows = (identities ?? []) as IdentityRow[]
   const docRows = (documents ?? []) as DocumentRow[]
   const episodeRows = (episodes ?? []) as EpisodeRow[]
+  const appointmentRows = (appointments ?? []) as Array<{
+    id: string
+    episode_id: string | null
+    visit_type: string
+    status: string
+    starts_at: string
+    ends_at: string
+    notes: string | null
+  }>
 
   return (
     <div className="space-y-6">
@@ -222,67 +244,130 @@ export default async function PatientProfilePage({
         </Card>
       </section>
 
-      <Card title="Episodes">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-[var(--text-3)]">
-              {episodeRows.length} {episodeRows.length === 1 ? 'episode' : 'episodes'}
-            </div>
-            <Link
-              href={`/app/episodes/new?patientId=${p.id}`}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--primary-600)] px-3 text-sm font-medium text-white hover:bg-[var(--primary-700)]"
-            >
-              Create episode for this patient
-            </Link>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-white">
-            {episodesError ? (
-              <div className="p-4 text-sm text-[var(--danger-600)]">
-                Failed to load episodes: {episodesError.message}
+      <section className="grid gap-4 md:grid-cols-2">
+        <Card title="Episodes">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-[var(--text-3)]">
+                {episodeRows.length} {episodeRows.length === 1 ? 'episode' : 'episodes'}
               </div>
-            ) : episodeRows.length === 0 ? (
-              <div className="p-4 text-sm text-[var(--text-2)]">No episodes yet.</div>
-            ) : (
-              <table className="min-w-full text-sm">
-                <thead className="bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-3)]">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Procedure</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">Scheduled</th>
-                    <th className="px-4 py-3 text-left">Updated</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {episodeRows.map((e) => (
-                    <tr key={e.id} className="hover:bg-[var(--surface-muted)]/60">
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/app/episodes/${e.id}`}
-                          className="font-medium text-[var(--primary-700)] hover:underline"
-                        >
-                          {e.procedure_name ?? '—'}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize bg-[var(--surface-muted)] text-[var(--text-2)]">
-                          {e.status ?? '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--text-2)]">
-                        {e.scheduled_at ? new Date(e.scheduled_at).toLocaleString() : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--text-2)]">
-                        {e.updated_at ? new Date(e.updated_at).toLocaleDateString() : '—'}
-                      </td>
+              <Link
+                href={`/app/episodes/new?patientId=${p.id}`}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--primary-600)] px-3 text-sm font-medium text-white hover:bg-[var(--primary-700)]"
+              >
+                Create episode
+              </Link>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-white">
+              {episodesError ? (
+                <div className="p-4 text-sm text-[var(--danger-600)]">
+                  Failed to load episodes: {episodesError.message}
+                </div>
+              ) : episodeRows.length === 0 ? (
+                <div className="p-4 text-sm text-[var(--text-2)]">No episodes yet.</div>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-3)]">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Procedure</th>
+                      <th className="px-4 py-3 text-left">Status</th>
+                      <th className="px-4 py-3 text-left">Scheduled</th>
+                      <th className="px-4 py-3 text-left">Updated</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {episodeRows.map((e) => (
+                      <tr key={e.id} className="hover:bg-[var(--surface-muted)]/60">
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/app/episodes/${e.id}`}
+                            className="font-medium text-[var(--primary-700)] hover:underline"
+                          >
+                            {e.procedure_name ?? '—'}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize bg-[var(--surface-muted)] text-[var(--text-2)]">
+                            {e.status ?? '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">
+                          {e.scheduled_at ? new Date(e.scheduled_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--text-2)]">
+                          {e.updated_at ? new Date(e.updated_at).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+
+        <Card title="Appointments">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-[var(--text-3)]">
+                Upcoming (next 30 days)
+              </div>
+              <Link
+                href={`/app/schedule/new?patientId=${p.id}`}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--primary-600)] px-3 text-sm font-medium text-white hover:bg-[var(--primary-700)]"
+              >
+                New appointment
+              </Link>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-white">
+              {appointmentsError ? (
+                <div className="p-4 text-sm text-[var(--danger-600)]">
+                  Failed to load appointments: {appointmentsError.message}
+                </div>
+              ) : appointmentRows.length === 0 ? (
+                <div className="p-4 text-sm text-[var(--text-2)]">No upcoming appointments.</div>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-3)]">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Date & Time</th>
+                      <th className="px-4 py-3 text-left">Type</th>
+                      <th className="px-4 py-3 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {appointmentRows.map((a) => {
+                      const startTime = new Date(a.starts_at)
+                      return (
+                        <tr key={a.id} className="hover:bg-[var(--surface-muted)]/60">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-[var(--text)]">
+                              {startTime.toLocaleDateString()}
+                            </div>
+                            <div className="text-xs text-[var(--text-3)]">
+                              {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-[var(--text-2)] capitalize">
+                            {a.visit_type ?? '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize bg-[var(--surface-muted)] text-[var(--text-2)]">
+                              {a.status.replace('_', ' ')}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </Card>
+      </section>
     </div>
   )
 }
