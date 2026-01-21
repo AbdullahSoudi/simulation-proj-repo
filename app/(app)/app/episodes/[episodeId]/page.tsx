@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
+import { PreOpChecklist } from './PreOpChecklist'
 
 type EpisodeRow = {
   id: string
@@ -107,6 +108,32 @@ export default async function EpisodeDetailPage({
   const p = patient as PatientRow | null
   const idRow = identity as IdentityRow | null
 
+  // Fetch checklist if exists
+  const { data: checklist } = await supabase
+    .from('episode_checklists')
+    .select('id')
+    .eq('episode_id', episodeId)
+    .maybeSingle()
+
+  let checklistItems: Array<{
+    id: string
+    label: string
+    sort_order: number
+    status: 'pending' | 'done' | 'not_applicable'
+    notes: string | null
+    completed_at: string | null
+  }> = []
+
+  if (checklist) {
+    const { data: items } = await supabase
+      .from('episode_checklist_items')
+      .select('id, label, sort_order, status, notes, completed_at')
+      .eq('episode_checklist_id', checklist.id)
+      .order('sort_order', { ascending: true })
+
+    checklistItems = (items ?? []) as typeof checklistItems
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -170,10 +197,15 @@ export default async function EpisodeDetailPage({
         </Card>
       </section>
 
+      <Card title="Pre-op checklist">
+        <PreOpChecklist
+          episodeId={episodeId}
+          checklistId={checklist?.id ?? null}
+          items={checklistItems}
+        />
+      </Card>
+
       <section className="grid gap-4 md:grid-cols-2">
-        <Card title="Pre-op checklist (placeholder)">
-          Pre-operative checklist and requirements will be implemented here.
-        </Card>
         <Card title="Anesthesia (placeholder)">
           Anesthesia clearance and notes will be implemented here.
         </Card>
