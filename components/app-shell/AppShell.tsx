@@ -9,6 +9,10 @@ import { Button } from '@/components/ui/button'
 
 export type Role = 'reception' | 'doctor'
 
+type UiRole = 'reception' | 'doctor'
+
+const VIEW_ROLES: Role[] = ['reception', 'doctor']
+
 type NavItem = {
   href: string
   label: string
@@ -46,7 +50,6 @@ const ROLE_NAV: Record<Role, string[]> = {
     '/app/patients',
     '/app/documents',
     '/app/templates',
-    '/app/settings',
   ],
   doctor: [
     '/app/dashboard',
@@ -59,7 +62,6 @@ const ROLE_NAV: Record<Role, string[]> = {
     '/app/review-queue',
     '/app/templates',
     '/app/reports',
-    '/app/settings',
   ],
 }
 
@@ -98,9 +100,10 @@ type AppShellProps = {
   children: React.ReactNode
   initialRole?: Role
   allowRoleSwitch?: boolean
+  isAdmin?: boolean
 }
 
-export function AppShell({ children, initialRole, allowRoleSwitch }: AppShellProps) {
+export function AppShell({ children, initialRole, allowRoleSwitch, isAdmin = false }: AppShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [role, setRole] = useState<Role>(initialRole ?? 'reception')
@@ -110,13 +113,32 @@ export function AppShell({ children, initialRole, allowRoleSwitch }: AppShellPro
 
   const grouped = useMemo(() => {
     const allowed = new Set(ROLE_NAV[role])
-    const visible = NAV_ITEMS.filter((i) => allowed.has(i.href))
+    let visible = NAV_ITEMS.filter((i) => allowed.has(i.href))
+    
+    // Add Admin group items if user is admin (independent of UI persona role)
+    if (isAdmin) {
+      const adminItems = NAV_ITEMS.filter((i) => i.group === 'Admin')
+      visible = [...visible, ...adminItems]
+      // Deduplicate by href (keep first occurrence)
+      const seen = new Set<string>()
+      visible = visible.filter((i) => {
+        if (seen.has(i.href)) {
+          return false
+        }
+        seen.add(i.href)
+        return true
+      })
+    }
+    
     const groups: Array<NavItem['group']> = ['Work', 'Clinical', 'Automation', 'Insights', 'Admin']
-    return groups.map((g) => ({
+    const groupedResult = groups.map((g) => ({
       group: g,
       items: visible.filter((i) => i.group === g),
     }))
-  }, [role])
+    
+    // Filter out groups with no items
+    return groupedResult.filter((g) => g.items.length > 0)
+  }, [role, isAdmin])
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -140,11 +162,14 @@ export function AppShell({ children, initialRole, allowRoleSwitch }: AppShellPro
               <select
                 className="mt-2 h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none"
                 value={role}
-                disabled={!canSwitchRole}
+                disabled={!canSwitchRole || VIEW_ROLES.length <= 1}
                 onChange={(e) => setRole(e.target.value as Role)}
               >
-                <option value="reception">Reception</option>
-                <option value="doctor">Doctor</option>
+                {VIEW_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </option>
+                ))}
               </select>
             </div>
 
