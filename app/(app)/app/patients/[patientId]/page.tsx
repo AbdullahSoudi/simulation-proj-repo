@@ -29,6 +29,14 @@ type DocumentRow = {
   uploaded_by: string | null
 }
 
+type EpisodeRow = {
+  id: string
+  status: string
+  procedure_name: string | null
+  scheduled_at: string | null
+  updated_at: string | null
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
@@ -105,9 +113,16 @@ export default async function PatientProfilePage({
     .eq('patient_id', patientId)
     .order('created_at', { ascending: false })
 
+  const { data: episodes, error: episodesError } = await supabase
+    .from('episodes')
+    .select('id, status, procedure_name, scheduled_at, updated_at')
+    .eq('patient_id', patientId)
+    .order('updated_at', { ascending: false })
+
   const p = patient as PatientRow
   const idRows = (identities ?? []) as IdentityRow[]
   const docRows = (documents ?? []) as DocumentRow[]
+  const episodeRows = (episodes ?? []) as EpisodeRow[]
 
   return (
     <div className="space-y-6">
@@ -206,6 +221,68 @@ export default async function PatientProfilePage({
           Timeline feed (appointments, encounters, documents, messages) — coming next.
         </Card>
       </section>
+
+      <Card title="Episodes">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-[var(--text-3)]">
+              {episodeRows.length} {episodeRows.length === 1 ? 'episode' : 'episodes'}
+            </div>
+            <Link
+              href={`/app/episodes/new?patientId=${p.id}`}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--primary-600)] px-3 text-sm font-medium text-white hover:bg-[var(--primary-700)]"
+            >
+              Create episode for this patient
+            </Link>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-white">
+            {episodesError ? (
+              <div className="p-4 text-sm text-[var(--danger-600)]">
+                Failed to load episodes: {episodesError.message}
+              </div>
+            ) : episodeRows.length === 0 ? (
+              <div className="p-4 text-sm text-[var(--text-2)]">No episodes yet.</div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-3)]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Procedure</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Scheduled</th>
+                    <th className="px-4 py-3 text-left">Updated</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {episodeRows.map((e) => (
+                    <tr key={e.id} className="hover:bg-[var(--surface-muted)]/60">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/app/episodes/${e.id}`}
+                          className="font-medium text-[var(--primary-700)] hover:underline"
+                        >
+                          {e.procedure_name ?? '—'}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize bg-[var(--surface-muted)] text-[var(--text-2)]">
+                          {e.status ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">
+                        {e.scheduled_at ? new Date(e.scheduled_at).toLocaleString() : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-2)]">
+                        {e.updated_at ? new Date(e.updated_at).toLocaleDateString() : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }
