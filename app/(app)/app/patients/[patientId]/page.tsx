@@ -119,34 +119,25 @@ export default async function PatientProfilePage({
     .eq('patient_id', patientId)
     .order('updated_at', { ascending: false })
 
-  // Fetch encounters (last 5 threads)
-  const { data: encounterThreads, error: encountersError } = await supabase
-    .from('encounter_threads')
-    .select('id, note_type, created_at')
+  // Fetch encounters (last 5)
+  const { data: encounters, error: encountersError } = await supabase
+    .from('encounters')
+    .select('id, type, status, created_at')
     .eq('patient_id', patientId)
     .order('created_at', { ascending: false })
     .limit(5)
 
-  // Fetch latest version status for each thread
-  const threadIds = (encounterThreads || []).map((t) => t.id)
-  const latestVersions: Record<string, { status: string }> = {}
-  if (threadIds.length > 0) {
-    const { data: versions } = await supabase
-      .from('encounter_versions')
-      .select('thread_id, status, created_at')
-      .in('thread_id', threadIds)
-      .order('created_at', { ascending: false })
-
-    if (versions) {
-      const seen = new Set<string>()
-      for (const v of versions as Array<{ thread_id: string; status: string }>) {
-        if (!seen.has(v.thread_id)) {
-          seen.add(v.thread_id)
-          latestVersions[v.thread_id] = { status: v.status }
-        }
-      }
-    }
-  }
+  const encounterRows = (encounters ?? []).map((e) => ({
+    id: e.id,
+    note_type: e.type,
+    created_at: e.created_at,
+    latest_version_status: e.status,
+  })) as Array<{
+    id: string
+    note_type: string
+    created_at: string
+    latest_version_status: string
+  }>
 
   // Fetch upcoming appointments (next 30 days)
   const now = new Date()
@@ -277,7 +268,7 @@ export default async function PatientProfilePage({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-xs text-[var(--text-3)]">
-              {encounterThreads?.length || 0} {encounterThreads?.length === 1 ? 'encounter' : 'encounters'}
+              {encounterRows.length} {encounterRows.length === 1 ? 'encounter' : 'encounters'}
             </div>
             <Link
               href={`/app/encounters/new?patientId=${p.id}`}
@@ -292,7 +283,7 @@ export default async function PatientProfilePage({
               <div className="p-4 text-sm text-[var(--danger-600)]">
                 Failed to load encounters: {encountersError.message}
               </div>
-            ) : !encounterThreads || encounterThreads.length === 0 ? (
+            ) : encounterRows.length === 0 ? (
               <div className="p-4 text-sm text-[var(--text-2)]">No encounters yet.</div>
             ) : (
               <table className="min-w-full text-sm">
@@ -305,9 +296,8 @@ export default async function PatientProfilePage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {encounterThreads.map((t) => {
-                    const latestVersion = latestVersions[t.id]
-                    const status = latestVersion?.status || 'draft'
+                  {encounterRows.map((t) => {
+                    const status = t.latest_version_status || 'draft'
                     return (
                       <tr key={t.id} className="hover:bg-[var(--surface-muted)]/60">
                         <td className="px-4 py-3 text-[var(--text-2)] capitalize">
@@ -342,7 +332,7 @@ export default async function PatientProfilePage({
               </table>
             )}
           </div>
-          {encounterThreads && encounterThreads.length > 0 && (
+          {encounterRows.length > 0 && (
             <div className="text-right">
               <Link
                 href={`/app/encounters?search=${encodeURIComponent(p.full_name || '')}`}

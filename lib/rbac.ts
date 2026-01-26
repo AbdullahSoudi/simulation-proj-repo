@@ -57,4 +57,15 @@ export async function requireAnesthesiaOrAdmin() {
   return { ...ctx, isAnesthesia }
 }
 
+export async function requireDoctorOrAdmin() {
+  const ctx = await getUserRoleIds()
+
+  const isDoctor = ctx.roleIds.includes('doctor')
+  if (!isDoctor && !ctx.isAdmin) {
+    redirect('/app/forbidden?reason=doctor')
+  }
+
+  return { ...ctx, isDoctor }
+}
+
 

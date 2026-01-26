@@ -20,13 +20,6 @@ type PrefilledEpisode = {
   patient_id: string
 } | null
 
-type PrefilledAppointment = {
-  id: string
-  starts_at: string
-  visit_type: string
-  patient_id: string
-} | null
-
 type PatientOption = {
   id: string
   full_name: string | null
@@ -38,20 +31,12 @@ type EpisodeOption = {
   procedure_name: string | null
 }
 
-type AppointmentOption = {
-  id: string
-  starts_at: string
-  visit_type: string
-}
-
 export function NewEncounterForm({
   prefilledPatient,
   prefilledEpisode,
-  prefilledAppointment,
 }: {
   prefilledPatient: PrefilledPatient
   prefilledEpisode: PrefilledEpisode
-  prefilledAppointment: PrefilledAppointment
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -62,21 +47,12 @@ export function NewEncounterForm({
   const [selectedEpisode, setSelectedEpisode] = useState<PrefilledEpisode>(prefilledEpisode)
   const [episodeOptions, setEpisodeOptions] = useState<EpisodeOption[]>([])
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false)
-  const [selectedAppointment, setSelectedAppointment] = useState<PrefilledAppointment>(prefilledAppointment)
-  const [appointmentOptions, setAppointmentOptions] = useState<AppointmentOption[]>([])
-  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false)
-  const [noteType, setNoteType] = useState('consultation')
+  const [encounterType, setEncounterType] = useState('consultation')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (selectedPatient && !prefilledEpisode) {
       loadEpisodes(selectedPatient.id)
-    }
-  }, [selectedPatient])
-
-  useEffect(() => {
-    if (selectedPatient && !prefilledAppointment) {
-      loadAppointments(selectedPatient.id)
     }
   }, [selectedPatient])
 
@@ -119,22 +95,6 @@ export function NewEncounterForm({
     }
   }
 
-  async function loadAppointments(patientId: string) {
-    setIsLoadingAppointments(true)
-    try {
-      const res = await fetch(`/app/encounters/new/api/search-appointments?patientId=${encodeURIComponent(patientId)}`)
-      if (!res.ok) {
-        throw new Error('Failed to load appointments')
-      }
-      const data = await res.json()
-      setAppointmentOptions(data.appointments || [])
-    } catch (err) {
-      console.error('Appointment load error:', err)
-      setAppointmentOptions([])
-    } finally {
-      setIsLoadingAppointments(false)
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -147,13 +107,12 @@ export function NewEncounterForm({
 
     startTransition(async () => {
       try {
-        const threadId = await createEncounterAction({
+        const encounterId = await createEncounterAction({
           patientId: selectedPatient.id,
           episodeId: selectedEpisode?.id || null,
-          appointmentId: selectedAppointment?.id || null,
-          noteType: noteType || 'consultation',
+          type: encounterType || 'consultation',
         })
-        router.push(`/app/encounters/${threadId}`)
+        router.push(`/app/encounters/${encounterId}`)
         router.refresh()
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to create encounter.'
@@ -200,9 +159,7 @@ export function NewEncounterForm({
                 onClick={() => {
                   setSelectedPatient(null)
                   setSelectedEpisode(null)
-                  setSelectedAppointment(null)
                   setEpisodeOptions([])
-                  setAppointmentOptions([])
                 }}
               >
                 Change
@@ -227,11 +184,10 @@ export function NewEncounterForm({
                       key={p.id}
                       type="button"
                       onClick={() => {
-                        setSelectedPatient(p)
-                        setPatientSearch('')
-                        setPatientOptions([])
-                        loadEpisodes(p.id)
-                        loadAppointments(p.id)
+                setSelectedPatient(p)
+                setPatientSearch('')
+                setPatientOptions([])
+                loadEpisodes(p.id)
                       }}
                       className="w-full px-4 py-2 text-left text-sm hover:bg-[var(--surface-muted)]"
                     >
@@ -270,47 +226,16 @@ export function NewEncounterForm({
               )}
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-[var(--text)]">Appointment (optional)</label>
-              <select
-                value={selectedAppointment?.id || ''}
-                onChange={(e) => {
-                  const appointment = appointmentOptions.find((apt) => apt.id === e.target.value)
-                  setSelectedAppointment(
-                    appointment
-                      ? {
-                          id: appointment.id,
-                          starts_at: appointment.starts_at,
-                          visit_type: appointment.visit_type,
-                          patient_id: selectedPatient.id,
-                        }
-                      : null
-                  )
-                }}
-                className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none"
-                disabled={isLoadingAppointments}
-              >
-                <option value="">None</option>
-                {appointmentOptions.map((apt) => (
-                  <option key={apt.id} value={apt.id}>
-                    {new Date(apt.starts_at).toLocaleString()} - {apt.visit_type}
-                  </option>
-                ))}
-              </select>
-              {isLoadingAppointments && (
-                <p className="text-xs text-[var(--text-3)]">Loading appointments...</p>
-              )}
-            </div>
           </>
         )}
 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-[var(--text)]">
-            Note Type <span className="text-[var(--danger-600)]">*</span>
+            Encounter Type <span className="text-[var(--danger-600)]">*</span>
           </label>
           <select
-            value={noteType}
-            onChange={(e) => setNoteType(e.target.value)}
+            value={encounterType}
+            onChange={(e) => setEncounterType(e.target.value)}
             className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none"
             required
           >

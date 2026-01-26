@@ -7,17 +7,11 @@ type SearchParams = {
   search?: string
 }
 
-type EncounterThreadRow = {
+type EncounterRow = {
   id: string
   patient_id: string
   episode_id: string | null
-  appointment_id: string | null
-  note_type: string
-  created_at: string
-}
-
-type LatestVersionRow = {
-  thread_id: string
+  type: string
   status: string
   updated_at: string
 }
@@ -35,28 +29,35 @@ export default async function EncountersPage({ searchParams }: { searchParams?: 
   const searchQuery = searchParams?.search || ''
 
   // Build query
-  let threadsQuery = supabase
-    .from('encounter_threads')
-    .select('id, patient_id, episode_id, appointment_id, note_type, created_at', {
+  let encountersQuery = supabase
+    .from('encounters')
+    .select('id, patient_id, episode_id, type, status, updated_at', {
       count: 'exact',
     })
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
 
   if (typeFilter) {
-    threadsQuery = threadsQuery.eq('note_type', typeFilter)
+    encountersQuery = encountersQuery.eq('type', typeFilter)
   }
 
   if (searchQuery) {
-    // Search by thread ID or patient name (we'll filter patient names in JS after fetching)
+    // Search by encounter ID or patient name (we'll filter patient names in JS after fetching)
     if (searchQuery.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
-      threadsQuery = threadsQuery.eq('id', searchQuery)
+      encountersQuery = encountersQuery.eq('id', searchQuery)
     }
   }
 
-  const { data: threads, error: threadsError, count } = await threadsQuery
+  const { data: encounters, error: encountersError, count } = await encountersQuery
 
-  const threadRows = (threads ?? []) as EncounterThreadRow[]
-  const patientIds = Array.from(new Set(threadRows.map((t) => t.patient_id)))
+  const encounterRows = (encounters ?? []) as Array<{
+    id: string
+    patient_id: string
+    episode_id: string | null
+    type: string
+    status: string
+    updated_at: string
+  }>
+  const patientIds = Array.from(new Set(encounterRows.map((e) => e.patient_id)))
 
   // Fetch patient names
   const patientsById = new Map<string, PatientRow>()
@@ -76,48 +77,18 @@ export default async function EncountersPage({ searchParams }: { searchParams?: 
   }
 
   // Filter by patient name if search query provided
-  let filteredThreads = threadRows
+  let filteredEncounters = encounterRows
   if (searchQuery && !searchQuery.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
-    filteredThreads = threadRows.filter((t) => {
-      const patient = patientsById.get(t.patient_id)
+    filteredEncounters = encounterRows.filter((e) => {
+      const patient = patientsById.get(e.patient_id)
       const name = patient?.full_name?.toLowerCase() || ''
       return name.includes(searchQuery.toLowerCase())
     })
   }
 
-  // Fetch latest version per thread
-  const threadIds = filteredThreads.map((t) => t.id)
-  const latestVersions: Record<string, LatestVersionRow> = {}
-
-  if (threadIds.length > 0) {
-    // Get latest version for each thread
-    const { data: versions } = await supabase
-      .from('encounter_versions')
-      .select('thread_id, status, created_at')
-      .in('thread_id', threadIds)
-      .order('created_at', { ascending: false })
-
-    if (versions) {
-      const seen = new Set<string>()
-      for (const v of versions as Array<{ thread_id: string; status: string; created_at: string }>) {
-        if (!seen.has(v.thread_id)) {
-          seen.add(v.thread_id)
-          latestVersions[v.thread_id] = {
-            thread_id: v.thread_id,
-            status: v.status,
-            updated_at: v.created_at,
-          }
-        }
-      }
-    }
-  }
-
-  // Filter by status if provided
+  // Filter by status if provided (encounters table has status field)
   if (statusFilter) {
-    filteredThreads = filteredThreads.filter((t) => {
-      const latestVersion = latestVersions[t.id]
-      return latestVersion?.status === statusFilter
-    })
+    filteredEncounters = filteredEncounters.filter((e) => e.status === statusFilter)
   }
 
   // Convert Maps to plain objects for serialization
@@ -126,18 +97,15 @@ export default async function EncountersPage({ searchParams }: { searchParams?: 
     patientsByIdObj[id] = patient
   }
 
-  const total = filteredThreads.length
-
   return (
     <EncountersClient
-      threads={filteredThreads}
-      latestVersions={latestVersions}
+      encounters={filteredEncounters}
       patientsById={patientsByIdObj}
-      total={total}
+      total={filteredEncounters.length}
       statusFilter={statusFilter}
       typeFilter={typeFilter}
       searchQuery={searchQuery}
-      encountersError={threadsError ? { message: threadsError.message } : null}
+      encountersError={encountersError ? { message: encountersError.message } : null}
     />
   )
 }

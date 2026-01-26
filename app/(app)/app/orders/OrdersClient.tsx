@@ -6,13 +6,17 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 
-type EncounterRow = {
+type OrderRow = {
   id: string
   patient_id: string
   episode_id: string | null
+  encounter_thread_id: string | null
   type: string
+  name: string
   status: string
-  updated_at: string
+  ordered_at: string
+  received_at: string | null
+  reviewed_at: string | null
 }
 
 type PatientRow = {
@@ -20,40 +24,39 @@ type PatientRow = {
   full_name: string | null
 }
 
-type EncounterClientProps = {
-  encounters: EncounterRow[]
+type OrdersClientProps = {
+  orders: OrderRow[]
   patientsById: Record<string, PatientRow>
   total: number
   statusFilter: string
   typeFilter: string
   searchQuery: string
-  encountersError: { message: string } | null
+  ordersError: { message: string } | null
 }
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'finalized', label: 'Finalized' },
+  { value: 'ordered', label: 'Ordered' },
+  { value: 'received', label: 'Received' },
+  { value: 'reviewed', label: 'Reviewed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 const TYPE_OPTIONS = [
   { value: '', label: 'All types' },
-  { value: 'consultation', label: 'Consultation' },
-  { value: 'follow_up', label: 'Follow-up' },
-  { value: 'pre_op', label: 'Pre-op' },
-  { value: 'post_op', label: 'Post-op' },
-  { value: 'other', label: 'Other' },
+  { value: 'lab', label: 'Lab' },
+  { value: 'imaging', label: 'Imaging' },
 ]
 
-export function EncountersClient({
-  encounters,
+export function OrdersClient({
+  orders,
   patientsById,
   total,
   statusFilter,
   typeFilter,
   searchQuery,
-  encountersError,
-}: EncounterClientProps) {
+  ordersError,
+}: OrdersClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -64,7 +67,7 @@ export function EncountersClient({
     } else {
       params.delete('status')
     }
-    router.push(`/app/encounters?${params.toString()}`)
+    router.push(`/app/orders?${params.toString()}`)
   }
 
   function handleTypeChange(newType: string) {
@@ -74,7 +77,7 @@ export function EncountersClient({
     } else {
       params.delete('type')
     }
-    router.push(`/app/encounters?${params.toString()}`)
+    router.push(`/app/orders?${params.toString()}`)
   }
 
   function handleSearchChange(newQuery: string) {
@@ -84,24 +87,19 @@ export function EncountersClient({
     } else {
       params.delete('search')
     }
-    router.push(`/app/encounters?${params.toString()}`)
+    router.push(`/app/orders?${params.toString()}`)
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Encounters"
-        description="Clinical notes and visit documentation."
-        actions={
-          <Button asChild>
-            <Link href="/app/encounters/new">New Encounter</Link>
-          </Button>
-        }
+        title="Orders"
+        description="Lab and imaging orders across the clinic."
       />
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-[var(--text)]">Encounter Threads</h2>
+          <h2 className="text-sm font-semibold text-[var(--text)]">Orders</h2>
           <div className="text-xs text-[var(--text-3)]">
             {total ? `${total} total` : '0 total'}
           </div>
@@ -115,7 +113,7 @@ export function EncountersClient({
             <div className="mt-3">
               <input
                 type="text"
-                placeholder="Patient name or thread ID"
+                placeholder="Patient name or order name"
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none"
@@ -163,61 +161,68 @@ export function EncountersClient({
         </div>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)] bg-white">
-          {encountersError ? (
+          {ordersError ? (
             <div className="p-4 text-sm text-[var(--danger-600)]">
-              Failed to load encounters: {encountersError.message}
+              Failed to load orders: {ordersError.message}
             </div>
-          ) : encounters.length === 0 ? (
-            <div className="p-4 text-sm text-[var(--text-2)]">No encounters found.</div>
+          ) : orders.length === 0 ? (
+            <div className="p-4 text-sm text-[var(--text-2)]">No orders found.</div>
           ) : (
             <table className="min-w-full text-sm">
               <thead className="bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-3)]">
                 <tr>
                   <th className="px-4 py-3 text-left">Patient</th>
+                  <th className="px-4 py-3 text-left">Order Name</th>
                   <th className="px-4 py-3 text-left">Type</th>
                   <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Updated</th>
+                  <th className="px-4 py-3 text-left">Ordered</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {encounters.map((e) => {
-                  const patient = patientsById[e.patient_id]
-
+                {orders.map((order) => {
+                  const patient = patientsById[order.patient_id]
                   return (
-                    <tr key={e.id} className="hover:bg-[var(--surface-muted)]/60">
+                    <tr key={order.id} className="hover:bg-[var(--surface-muted)]/60">
                       <td className="px-4 py-3">
                         <Link
-                          href={`/app/patients/${e.patient_id}`}
+                          href={`/app/patients/${order.patient_id}`}
                           className="font-medium text-[var(--primary-700)] hover:underline"
                         >
                           {patient?.full_name ?? '(Unknown)'}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-[var(--text-2)] capitalize">
-                        {e.type.replace('_', ' ')}
-                      </td>
+                      <td className="px-4 py-3 font-medium text-[var(--text)]">{order.name}</td>
+                      <td className="px-4 py-3 text-[var(--text-2)] capitalize">{order.type}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize ${
-                            e.status === 'finalized'
+                            order.status === 'reviewed'
                               ? 'bg-[var(--success-100)] text-[var(--success-600)]'
-                              : 'bg-[var(--warning-100)] text-[var(--warning-600)]'
+                              : order.status === 'received'
+                                ? 'bg-[var(--info-100)] text-[var(--info-600)]'
+                                : order.status === 'cancelled'
+                                  ? 'bg-[var(--surface-muted)] text-[var(--text-3)]'
+                                  : 'bg-[var(--warning-100)] text-[var(--warning-600)]'
                           }`}
                         >
-                          {e.status}
+                          {order.status}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-[var(--text-2)]">
-                        {new Date(e.updated_at).toLocaleDateString()}
+                        {new Date(order.ordered_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/app/encounters/${e.id}`}
-                          className="text-sm font-medium text-[var(--primary-700)] hover:underline"
-                        >
-                          View
-                        </Link>
+                        {order.encounter_thread_id ? (
+                          <Link
+                            href={`/app/encounters/${order.encounter_thread_id}`}
+                            className="text-sm font-medium text-[var(--primary-700)] hover:underline"
+                          >
+                            View Encounter
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-[var(--text-3)]">—</span>
+                        )}
                       </td>
                     </tr>
                   )

@@ -13,23 +13,15 @@ type PrefilledEpisode = {
   patient_id: string
 } | null
 
-type PrefilledAppointment = {
-  id: string
-  starts_at: string
-  visit_type: string
-  patient_id: string
-} | null
-
 export default async function NewEncounterPage({
   searchParams,
 }: {
-  searchParams?: { patientId?: string; episodeId?: string; appointmentId?: string }
+  searchParams?: { patientId?: string; episodeId?: string }
 }) {
   const supabase = await getSupabaseServerClient()
 
   let prefilledPatient: PrefilledPatient = null
   let prefilledEpisode: PrefilledEpisode = null
-  let prefilledAppointment: PrefilledAppointment = null
 
   if (searchParams?.patientId) {
     const { data: patient } = await supabase
@@ -71,29 +63,10 @@ export default async function NewEncounterPage({
     }
   }
 
-  if (searchParams?.appointmentId && prefilledPatient) {
-    const { data: appointment } = await supabase
-      .from('appointments')
-      .select('id, starts_at, visit_type, patient_id')
-      .eq('id', searchParams.appointmentId)
-      .eq('patient_id', prefilledPatient.id)
-      .maybeSingle()
-
-    if (appointment) {
-      prefilledAppointment = {
-        id: appointment.id,
-        starts_at: appointment.starts_at,
-        visit_type: appointment.visit_type,
-        patient_id: appointment.patient_id,
-      }
-    }
-  }
-
   return (
     <NewEncounterForm
       prefilledPatient={prefilledPatient}
       prefilledEpisode={prefilledEpisode}
-      prefilledAppointment={prefilledAppointment}
     />
   )
 }
